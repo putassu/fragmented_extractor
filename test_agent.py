@@ -23,7 +23,9 @@ async def test():
     with open(path2, "w", encoding="utf-8") as f:
         f.write("Ответственный: Петров. Статус: Пройдено.")
 
+
     inputs = {
+        "model": "gemma3:4b",
         "user_prompt": "Собери данные по протоколу, объекту и ответственному.",
         "files_metadata": [
             {"filename": "ABC-777", "filepath": path1},
@@ -32,6 +34,8 @@ async def test():
         "raw_results": [],
         "errors": []
     }
+
+    
 
     logging.getLogger("FFPA").info("Starting test agent execution...")
     
