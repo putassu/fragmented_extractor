@@ -1,23 +1,21 @@
-from typing import Annotated, List, Dict, Union, Optional
-from typing_extensions import TypedDict
-import operator
+from typing import TypedDict, List, Dict, Any, Optional
+from langchain_core.messages import BaseMessage
 
-class ExtractionState(TypedDict):
-    # Входные данные от Мастера
-    user_prompt: str
-    files_metadata: List[Dict] # [{filename, filepath, total_tokens}]
+class AgentState(TypedDict):
+    # Данные от мастер-агента
+    model: str = "gemma3:4b"                # Название модели, например "gemma-3-27" или "deepseek-r1"
+    user_prompt: str          # Исходный кривой промпт пользователя
+    files: List[Dict]         # [{filename: "abc.pdf", text: "...", filepath: "..."}]
+    history: List[BaseMessage] # История диалога
     
-    # Внутреннее состояние
-    generated_schema: Dict
-    primary_key: str
-    calculable_fields: List[str]
-    user_mapping: Dict
+    # Внутреннее состояние экстрактора (заполняется в процессе)
+    primary_key: List[str]
+    schema: Dict[str, Any]
+    calc_fields: List[str]
+    user_mapping: Dict[str, str]
     
-    # Результаты (Annotated для накопления в параллельных узлах)
-    raw_results: Annotated[List[Dict], operator.add]
+    # Результаты
+    raw_results: List[Dict]
     final_data: List[Dict]
-    
-    # Служебные поля
     needs_sandbox: bool
     errors: List[str]
-    status: str
