@@ -4,16 +4,78 @@ from typing import List, Dict, Any
 
 logger = logging.getLogger("FFPA.utils")
 
-def robust_json_parser(text: str) -> Any:
-    try:
-        # Улучшенный поиск JSON: ищем самый широкий охват [ ] или { }
-        match = re.search(r'(\[.*\]|\{.*\})', text, re.DOTALL)
-        if match:
-            return json.loads(match.group(1))
-    except:
-        logger.error(f"Failed to parse JSON: {text[:200]}")
-    return []
+import json
+import re
 
+def count_tokens_est(text: str) -> int:
+    """
+    Грубая оценка количества токенов. 
+    Для кириллицы/смешанного текста берем ~3.5 символа на токен.
+    """
+    if not text:
+        return 0
+    return len(text) // 3
+
+def get_text_chunks(text: str, context_window: int, chunk_size_pct: float, overlap: int) -> list[str]:
+    """
+    Разбивает текст на куски, основываясь на проценте от контекстного окна.
+    """
+    # Вычисляем размер чанка в символах (примерно)
+    # Если окно 60 000 токенов, а CHUNK_SIZE 0.15 -> чанк 9 000 токенов -> ~27 000 символов
+    tokens_per_chunk = int(context_window * chunk_size_pct)
+    chars_per_chunk = tokens_per_chunk * 3 
+    
+    chunks = []
+    start = 0
+    text_len = len(text)
+    
+    while start < text_len:
+        end = start + chars_per_chunk
+        chunk = text[start:end]
+        chunks.append(chunk)
+        start += (chars_per_chunk - overlap)
+        
+        # Защита от бесконечного цикла, если overlap слишком большой
+        if start >= text_len or chars_per_chunk <= overlap:
+            break
+            
+    return chunks
+
+def robust_json_parser(text: str):
+    """Очистка ответа LLM от маркдауна и парсинг JSON"""
+    try:
+        # Убираем блоки ```json ... ```
+        clean_text = re.sub(r'```json\s*|\s*```', '', text).strip()
+        return json.loads(clean_text)
+    except Exception:
+        # Пытаемся найти что-то похожее на JSON массив или объект
+        match = re.search(r'(\{.*\}|\[.*\])', clean_text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except:
+                return None
+        return None
+
+# def sequence_reduce(raw_results: list[dict], pk_fields: list[str]) -> list[dict]:
+#     """
+#     Склеивает результаты экстракции по первичным ключам.
+#     """
+#     merged = {}
+    
+#     for item in raw_results:
+#         # Создаем уникальный ключ для записи на основе PK
+#         pk_value = tuple(str(item.get(f, "")).strip().lower() for f in pk_fields)
+        
+#         if pk_value not in merged:
+#             merged[pk_value] = item
+#         else:
+#             # Обновляем поля, если они пустые (простейшая склейка)
+#             for k, v in item.items():
+#                 if not merged[pk_value].get(k):
+#                     merged[pk_value][k] = v
+                    
+#     return list(merged.values())
 def sequence_reduce(raw_results: List[Dict], pk_fields: List[str]) -> List[Dict]:
     if not raw_results: return []
     
